@@ -66,17 +66,26 @@ export const CalendarView = ({ user, onOpenMeeting }) => {
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
-    if (!newTitle.trim() || !user) return;
+    if (!newTitle.trim()) return;
 
     const startISO = `${selectedDateStr}T10:00:00Z`;
 
     try {
       if (isSupabaseConfigured) {
+        // Fetch active authenticated Supabase user session
+        const { data: authData } = await supabase.auth.getUser();
+        const activeUser = authData?.user;
+
+        if (!activeUser) {
+          alert('Please Sign In or Register an account to save events to your database.');
+          return;
+        }
+
         const { data, error } = await supabase
           .from('events')
           .insert([
             {
-              owner: user.id,
+              owner: activeUser.id,
               title: newTitle.trim(),
               start: startISO,
             }
@@ -89,15 +98,16 @@ export const CalendarView = ({ user, onOpenMeeting }) => {
         }
       } else {
         // Fallback local storage
+        const currentUserId = user?.id || 'demo-user';
         const newEvt = {
           id: Date.now(),
-          owner: user.id,
+          owner: currentUserId,
           title: newTitle.trim(),
           start: startISO,
         };
         const updated = [...events, newEvt];
         setEvents(updated);
-        localStorage.setItem(`events_${user.id}`, JSON.stringify(updated));
+        localStorage.setItem(`events_${currentUserId}`, JSON.stringify(updated));
       }
 
       setNewTitle('');

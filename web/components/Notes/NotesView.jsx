@@ -60,15 +60,23 @@ export const NotesView = ({ user }) => {
 
   const handleCreateNote = async (e) => {
     e.preventDefault();
-    if (!newContent.trim() || !user) return;
+    if (!newContent.trim()) return;
 
     try {
       if (isSupabaseConfigured) {
+        const { data: authData } = await supabase.auth.getUser();
+        const activeUser = authData?.user;
+
+        if (!activeUser) {
+          alert('Please Sign In or Register an account to save diary notes to your database.');
+          return;
+        }
+
         const { data, error } = await supabase
           .from('notes')
           .insert([
             {
-              owner: user.id,
+              owner: activeUser.id,
               content: newContent.trim(),
             }
           ])
@@ -79,15 +87,16 @@ export const NotesView = ({ user }) => {
           setNotes((prev) => [data[0], ...prev]);
         }
       } else {
+        const currentUserId = user?.id || 'demo-user';
         const newNote = {
           id: Date.now(),
-          owner: user.id,
+          owner: currentUserId,
           content: newContent.trim(),
           created_at: new Date().toISOString(),
         };
         const updated = [newNote, ...notes];
         setNotes(updated);
-        localStorage.setItem(`notes_${user.id}`, JSON.stringify(updated));
+        localStorage.setItem(`notes_${currentUserId}`, JSON.stringify(updated));
       }
 
       setNewContent('');

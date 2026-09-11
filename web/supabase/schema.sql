@@ -53,6 +53,32 @@ CREATE POLICY "Users can delete own notes" ON public.notes
   FOR DELETE USING (auth.uid() = owner);
 
 
--- 3. Indexes for fast query performance by owner
+-- 3. Database Triggers to automatically set owner = auth.uid()
+CREATE OR REPLACE FUNCTION public.set_owner_on_insert()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.owner IS NULL OR NEW.owner != auth.uid() THEN
+    NEW.owner := auth.uid();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger for events table
+DROP TRIGGER IF EXISTS tr_set_events_owner ON public.events;
+CREATE TRIGGER tr_set_events_owner
+  BEFORE INSERT ON public.events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_owner_on_insert();
+
+-- Trigger for notes table
+DROP TRIGGER IF EXISTS tr_set_notes_owner ON public.notes;
+CREATE TRIGGER tr_set_notes_owner
+  BEFORE INSERT ON public.notes
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_owner_on_insert();
+
+
+-- 4. Indexes for fast query performance by owner
 CREATE INDEX IF NOT EXISTS events_owner_idx ON public.events(owner);
 CREATE INDEX IF NOT EXISTS notes_owner_idx ON public.notes(owner);
